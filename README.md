@@ -1,4 +1,5 @@
-# OpenBCI_PosixC
+
+# Open BCI Posix Driver in C
 
 Simple and raw implementation of a basic posix library for C/C++ to access OpenBCI signals or log them into a file.
 
