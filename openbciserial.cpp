@@ -245,10 +245,154 @@ int beginstreamingdata(int fd)
     return 0;
 }
 
+        // sendByteString = b'x' + \
+        // self.getByteSendStringForChannelNumber(channelNumber) + \
+        // (b'0' if self.status[self.getChannelRowByChannelNumber(channelNumber)] == "on" else b'1') + \
+        // b'6' + \
+        // b'0' + \
+        // (b'0' if self.channelNumberConnectIsBimodal(channelNumber) else b'1') + \
+        // (b'0' if self.channelNumberConnectIsBimodal(channelNumber) else b'1') + \
+        // b'0' + \
+        // b'X'
+        // return sendByteString
+
+// x (CHANNEL, POWER_DOWN, GAIN_SET, INPUT_TYPE_SET, BIAS_SET, SRB2_SET, SRB1_SET) X 
+
+int enablechannel(int fd, int channel, bool bimodal)
+{
+    char buf [256];
+
+    if (bimodal)
+        sprintf(buf,"x%1d060000X",channel);
+    else
+        sprintf(buf,"x%1d060110X",channel);
+
+
+    ssize_t nbytes = write (fd, buf, 9);           // send the register query command.
+    if (nbytes==-1)
+    {
+        printf ("error %d writing bytes to port: %s", errno, strerror (errno));
+        return -1;
+    }
+
+
+    usleep ((7 + 25) * 100);             // sleep enough to transmit those bytes.
+
+    int n = read (fd, buf, sizeof(buf));  // read up to 100 characters if ready to read
+
+    //printf ("%d bytes received\n", n);
+
+    int stopMark = 0;  // $ counter
+
+    while (true)
+    {
+        //printf ("Reading:%d\n",n);
+        for(int i=0;i<n;i++)
+        {
+            char c = buf[i];
+            printf ("%c",c);
+
+            if (c=='$')
+                stopMark++;
+        }
+
+        if (stopMark>=3)
+            break;
+
+        n = read (fd, buf, sizeof(buf));  // read up to Buf characters if ready to read
+    }
+
+    return 0;
+}
+
+
+int defaultchannelselection(int fd)
+{
+    char buf [256];
+
+    ssize_t nbytes = write (fd, "d", 1);           // send the register query command.
+    if (nbytes==-1)
+    {
+        printf ("error %d writing bytes to port: %s", errno, strerror (errno));
+        return -1;
+    }
+
+
+    usleep ((7 + 25) * 100);             // sleep enough to transmit those bytes.
+
+    int n = read (fd, buf, sizeof(buf));  // read up to 100 characters if ready to read
+
+    //printf ("%d bytes received\n", n);
+
+    int stopMark = 0;  // $ counter
+
+    while (true)
+    {
+        //printf ("Reading:%d\n",n);
+        for(int i=0;i<n;i++)
+        {
+            char c = buf[i];
+            printf ("%c",c);
+
+            if (c=='$')
+                stopMark++;
+        }
+
+        if (stopMark>=3)
+            break;
+
+        n = read (fd, buf, sizeof(buf));  // read up to Buf characters if ready to read
+    }
+
+    return 0;
+}
+
+
+int checksamplingfrequency(int fd)
+{
+    char buf [256];
+
+    ssize_t nbytes = write (fd, "~~", 2);           // send the register query command.
+    if (nbytes==-1)
+    {
+        printf ("error %d writing bytes to port: %s", errno, strerror (errno));
+        return -1;
+    }
+
+
+    usleep ((7 + 25) * 100);             // sleep enough to transmit those bytes.
+
+    int n = read (fd, buf, sizeof(buf));  // read up to 100 characters if ready to read
+
+    //printf ("%d bytes received\n", n);
+
+    int stopMark = 0;  // $ counter
+
+    while (true)
+    {
+        //printf ("Reading:%d\n",n);
+        for(int i=0;i<n;i++)
+        {
+            char c = buf[i];
+            printf ("%c",c);
+
+            if (c=='$')
+                stopMark++;
+        }
+
+        if (stopMark>=3)
+            break;
+
+        n = read (fd, buf, sizeof(buf));  // read up to Buf characters if ready to read
+    }
+
+    return 0;
+}
+
 int logstreamingdata(int fd, char * filename, int duration)
 {
     char eeg[35];
-    int fs=512;
+    int fs=250;
 
     int samples=1;
     int n;
@@ -319,15 +463,24 @@ int endstreamingdata(int fd)
 
 int test()
 {
-    char *portname = "/dev/tty.usbserial-DN0096Q1";
+    char *portname = "/dev/ttyUSB0";
 
     signal (SIGINT,(void (*)(int))killsignalhandler);
 
     int fd = openserialport(portname);
 
-    beginstreamingdata(fd);
+    checksamplingfrequency(fd);
 
-    logstreamingdata(fd, "eeg.dat", 10);
+    //defaultchannelselection(fd);
+
+    for(int i=1;i<=8;i++)
+    {
+        enablechannel(fd,i,(i==1 || i==2));
+    }
+
+    beginstreamingdata(fd); 
+
+    logstreamingdata(fd, "eeg.dat", 100000);
 
     endstreamingdata(fd);
 
